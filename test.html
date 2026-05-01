@@ -1,0 +1,30 @@
+import React, { useState } from 'react';
+import ReactPlayer from 'react-player'; // Supports HLS out of the box
+
+function FileStreamer() {
+  const [streamUrl, setStreamUrl] = useState("");
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    setStreamUrl(data.stream_url);
+  };
+
+  return (
+    <div style={{ maxWidth: '800px', margin: 'auto', padding: '50px' }}>
+      <h2>Video Dump & Stream</h2>
+      <input type="file" onChange={handleUpload} />
+      
+      {streamUrl && (
+        <div style={{ marginTop: '20px' }}>
+          <p>Stream Link: <code>{streamUrl}</code></p>
+          <ReactPlayer url={streamUrl} controls width="100%" />
+        </div>
+      )}
+    </div>
+  );
+}
