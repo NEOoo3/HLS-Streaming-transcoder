@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamForge | Pro Transcoding</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #050505; color: #fafafa; overflow-x: hidden; }
+        .mono { font-family: 'JetBrains+Mono', monospace; }
+
+        .mesh-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            background: radial-gradient(circle at 20% 30%, #0d1117 0%, transparent 40%),
+                        radial-gradient(circle at 80% 70%, #0a1a1a 0%, transparent 40%);
+        }
+
+        .glass-panel { 
+            background: rgba(15, 15, 15, 0.7); 
+            backdrop-filter: blur(20px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .progress-fill {
+            transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            background: linear-gradient(90deg, #14b8a6 0%, #2dd4bf 100%);
+            position: relative;
+        }
+
+        video::-webkit-media-controls-panel { background-image: linear-gradient(transparent, rgba(0,0,0,0.8)); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6">
+    <div class="mesh-bg"></div>
+
+    <div class="w-full max-w-2xl space-y-8">
+        <header class="text-center space-y-1">
+            <h1 class="text-xs font-bold tracking-[0.3em] uppercase text-zinc-500">StreamForge Pipeline</h1>
+            <div class="h-px w-12 bg-zinc-800 mx-auto mt-4"></div>
+        </header>
+
+        <main class="glass-panel rounded-2xl p-8 space-y-8">
+            <div id="dropZone" class="group relative border border-zinc-800/50 rounded-xl p-16 text-center transition-all hover:bg-zinc-900/30 hover:border-zinc-700 cursor-pointer">
+                <input type="file" id="videoInput" class="hidden" accept="video/*">
+                <div class="space-y-4 flex flex-col items-center">
+                    <div class="p-5 bg-zinc-900 rounded-2xl border border-zinc-800 group-hover:border-zinc-600 transition-all transform group-hover:scale-105">
+                        <i data-lucide="upload" class="w-8 h-8 text-teal-500"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium text-zinc-300 tracking-tight">Ingest Media File</p>
+                        <p class="text-[10px] text-zinc-600 uppercase tracking-widest">Supports MP4, MKV, MOV, AVI</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="monitorSection" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                        </span>
+                        <span id="taskLabel" class="mono text-[10px] text-zinc-500 tracking-tighter">TASK: PENDING</span>
+                    </div>
+                    <span id="percentage" class="mono text-xs font-bold text-teal-400">0%</span>
+                </div>
+
+                <div class="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+                    <div id="progressFill" class="progress-fill h-full w-0"></div>
+                </div>
+
+                <div class="relative bg-black/60 rounded-lg border border-zinc-800/50 p-4 min-h-[80px] overflow-hidden">
+                    <div id="logContainer" class="mono text-[10px] text-teal-500/80 space-y-1">
+                        <div class="flex space-x-2"><span class="text-zinc-700">--:--:--</span> <span>IDLE_DAEMON_LISTENING...</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="playerSection" class="hidden space-y-4 animate-in fade-in zoom-in duration-500">
+                <div class="flex items-center justify-between px-1">
+                    <div class="flex items-center space-x-3">
+                        <p class="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Stream Preview</p>
+                        <select id="qualitySelect" onchange="changeQuality()" class="bg-zinc-900 border border-zinc-800 text-teal-500 text-[9px] font-bold rounded px-2 py-1 outline-none hover:border-teal-500 transition-all cursor-pointer">
+                            <option value="-1">AUTO</option>
+                            <option value="0">360P</option>
+                            <option value="1">720P</option>
+                            <option value="2">1080P</option>
+                        </select>
+                    </div>
+                    <button onclick="location.reload()" class="text-[9px] text-zinc-400 hover:text-white uppercase tracking-widest transition-colors">New Transcode</button>
+                </div>
+                <div class="rounded-xl border border-zinc-800 overflow-hidden bg-black aspect-video relative group">
+                    <video id="videoPlayer" class="w-full h-full object-cover" controls></video>
+                </div>
+                <div class="glass-panel rounded-lg p-3 flex items-center justify-between">
+                    <p id="finalUrl" class="mono text-[10px] text-zinc-500 truncate w-3/4"></p>
+                    <button onclick="copyUrl()" class="text-[10px] text-teal-500 font-bold uppercase hover:text-teal-400 transition-colors">Copy URL</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('videoInput');
+        const monitor = document.getElementById('monitorSection');
+        const logContainer = document.getElementById('logContainer');
+        const video = document.getElementById('videoPlayer');
+        let hlsInstance = null; // Global instance for quality switching
+
+        dropZone.onclick = () => fileInput.click();
+
+        function uploadVideo() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            
+            dropZone.style.display = 'none';
+            monitor.classList.remove('hidden');
+            addLog("INGESTION", "INITIATED");
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    document.getElementById('progressFill').style.width = `${percent}%`;
+                    document.getElementById('percentage').innerText = `${percent}%`;
+                    if (percent % 20 === 0) addLog("BUFFERING", `${percent}%`);
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    addLog("UPLOAD", "SUCCESS");
+                    beginTracking(response.task_id); 
+                } else {
+                    addLog("ERROR", "UPLINK_FAILURE", "text-red-500");
+                }
+            };
+
+            xhr.open('POST', 'http://127.0.0.1:8000/upload');
+            xhr.send(formData);
+        }
+
+        fileInput.onchange = uploadVideo;
+
+        function addLog(action, status, color = "text-teal-500") {
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+            const entry = document.createElement('div');
+            entry.className = "flex space-x-2";
+            entry.innerHTML = `<span class="text-zinc-700">${time}</span> <span class="${color}">${action}... ${status}</span>`;
+            logContainer.prepend(entry);
+        }
+
+        function beginTracking(id) {
+    document.getElementById('taskLabel').innerText = `ID: ${id.substring(0,12)}`;
+    addLog("PIPELINE", "FORGING_LAYERS");
+    
+    let lastProg = -1;
+    const poll = setInterval(async () => {
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/status/${id}`);
+            const data = await res.json();
+            const prog = Math.floor(data.progress);
+
+            // Update the progress bar while working
+            document.getElementById('progressFill').style.width = `${prog}%`;
+            document.getElementById('percentage').innerText = `${prog}%`;
+
+            if (data.status === 'completed') {
+                clearInterval(poll);
+                addLog("ENGINE", "FINALIZING_STREAM");
+                
+                // THE TRANSITION: Force the UI to show the "Output Page"
+                setTimeout(() => setupPlayer(data.stream_url), 500); 
+            }
+        } catch (e) { 
+            console.error("Connection to Forge lost"); 
+            addLog("ERROR", "UPLINK_LOST", "text-red-500");
+        }
+    }, 1000);
+}
+
+function setupPlayer(url) {
+    
+    monitor.style.display = 'none'; 
+    monitor.classList.add('hidden');
+
+    
+    const playerSection = document.getElementById('playerSection');
+    playerSection.style.display = 'block'; 
+    playerSection.classList.remove('hidden');
+    
+    document.getElementById('finalUrl').innerText = url;
+
+    if (Hls.isSupported()) {
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(video);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+            addLog("OUTPUT", "DISPLAY_READY");
+            video.play(); 
+        });
+    }
+}
+
+        function changeQuality() {
+            const selector = document.getElementById('qualitySelect');
+            const level = parseInt(selector.value);
+            if (hlsInstance) {
+                hlsInstance.currentLevel = level;
+                addLog("SHIFT", selector.options[selector.selectedIndex].text);
+            }
+        }
+
+        function copyUrl() {
+            navigator.clipboard.writeText(document.getElementById('finalUrl').innerText);
+            addLog("CLIPBOARD", "URL_COPIED");
+        }
+    </script>
+</body>
+</html>
