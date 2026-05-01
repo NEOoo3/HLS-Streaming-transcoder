@@ -1,0 +1,14 @@
+# --- Python Specific ---
+__pycache__/          # Ignore compiled Python files
+*.py[cod]             # Ignore compiled bytecode
+venv/                 # Ignore your local virtual environment
+
+# --- Project Specific (Storage & Media) ---
+storage/              # Ignore the folder where uploaded/processed videos live
+*.mp4                 # Ignore raw video files
+*.m3u8                # Ignore HLS playlists
+*.ts                  # Ignore HLS video segments
+
+# --- System Specific ---
+.DS_Store             # Ignore macOS system files
+Thumbs.db             # Ignore Windows thumbnail cache
